@@ -1,0 +1,461 @@
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+local UserInputService = game:GetService("UserInputService")
+
+-- Основное GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "XXHub"
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 250, 0, 350)
+Frame.Position = UDim2.new(0.5, -125, 0.5, -175)
+Frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Frame.Parent = ScreenGui
+Frame.Active = true
+Frame.Draggable = true
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "XXHub"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Parent = Frame
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 50, 0, 50)
+ToggleButton.Position = UDim2.new(0, 10, 0.5, -25)
+ToggleButton.Text = ">>"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+ToggleButton.Parent = ScreenGui
+ToggleButton.Active = true
+ToggleButton.Draggable = true
+local isMenuVisible = true
+
+ToggleButton.MouseButton1Click:Connect(function()
+    isMenuVisible = not isMenuVisible
+    Frame.Visible = isMenuVisible
+    ToggleButton.Text = isMenuVisible and ">>" or "<<"
+end)
+
+-- Вкладки
+local TabFrame = Instance.new("Frame")
+TabFrame.Size = UDim2.new(1, 0, 0, 30)
+TabFrame.Position = UDim2.new(0, 0, 0, 30)
+TabFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+TabFrame.Parent = Frame
+
+local tabs = {"Player", "Misc", "Random", "FE"}
+local tabFrames = {}
+local currentTab = "Player"
+
+for i, tabName in ipairs(tabs) do
+    local TabButton = Instance.new("TextButton")
+    TabButton.Size = UDim2.new(0.25, -2, 1, -2)
+    TabButton.Position = UDim2.new((i-1) * 0.25, 1, 0, 1)
+    TabButton.Text = tabName
+    TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TabButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    TabButton.Parent = TabFrame
+    TabButton.MouseButton1Click:Connect(function()
+        currentTab = tabName
+        for _, frame in pairs(tabFrames) do
+            frame.Visible = false
+        end
+        tabFrames[tabName].Visible = true
+    end)
+
+    local TabContent = Instance.new("Frame")
+    TabContent.Size = UDim2.new(1, 0, 1, -60)
+    TabContent.Position = UDim2.new(0, 0, 0, 60)
+    TabContent.BackgroundTransparency = 1
+    TabContent.Parent = Frame
+    TabContent.Visible = (tabName == "Player")
+    tabFrames[tabName] = TabContent
+end
+
+-- Переменные
+local flying = false
+local noclip = false
+local rainbow = false
+local infJump = false
+local flySpeed = 50
+local walkSpeed = 16
+local jumpPower = 50
+
+-- Вкладка Player
+local PlayerFrame = tabFrames["Player"]
+
+local PlayerName = Instance.new("TextLabel")
+PlayerName.Size = UDim2.new(1, -10, 0, 30)
+PlayerName.Position = UDim2.new(0, 5, 0, 5)
+PlayerName.Text = "Ник: " .. player.Name
+PlayerName.TextColor3 = Color3.fromRGB(255, 255, 255)
+PlayerName.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+PlayerName.Parent = PlayerFrame
+
+local FlyButton = Instance.new("TextButton")
+FlyButton.Size = UDim2.new(1, -10, 0, 40)
+FlyButton.Position = UDim2.new(0, 5, 0, 40)
+FlyButton.Text = "Полет"
+FlyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+FlyButton.Parent = PlayerFrame
+
+local WalkSpeedSlider = Instance.new("TextLabel")
+WalkSpeedSlider.Size = UDim2.new(1, -10, 0, 20)
+WalkSpeedSlider.Position = UDim2.new(0, 5, 0, 85)
+WalkSpeedSlider.Text = "Скорость: " .. walkSpeed
+WalkSpeedSlider.TextColor3 = Color3.fromRGB(255, 255, 255)
+WalkSpeedSlider.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+WalkSpeedSlider.Parent = PlayerFrame
+
+local WalkSpeedBar = Instance.new("TextButton")
+WalkSpeedBar.Size = UDim2.new(1, -10, 0, 10)
+WalkSpeedBar.Position = UDim2.new(0, 5, 0, 105)
+WalkSpeedBar.Text = ""
+WalkSpeedBar.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+WalkSpeedBar.Parent = PlayerFrame
+WalkSpeedBar.MouseButton1Down:Connect(function()
+    local mouse = player:GetMouse()
+    local conn
+    conn = mouse.Move:Connect(function()
+        local value = math.clamp((mouse.X - WalkSpeedBar.AbsolutePosition.X) / WalkSpeedBar.AbsoluteSize.X, 0, 1)
+        walkSpeed = math.floor(16 + value * 84)
+        if not flying then humanoid.WalkSpeed = walkSpeed end
+        WalkSpeedSlider.Text = "Скорость: " .. walkSpeed
+    end)
+    mouse.Button1Up:Wait()
+    conn:Disconnect()
+end)
+
+local JumpPowerSlider = Instance.new("TextLabel")
+JumpPowerSlider.Size = UDim2.new(1, -10, 0, 20)
+JumpPowerSlider.Position = UDim2.new(0, 5, 0, 120)
+JumpPowerSlider.Text = "Прыжок: " .. jumpPower
+JumpPowerSlider.TextColor3 = Color3.fromRGB(255, 255, 255)
+JumpPowerSlider.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+JumpPowerSlider.Parent = PlayerFrame
+
+local JumpPowerBar = Instance.new("TextButton")
+JumpPowerBar.Size = UDim2.new(1, -10, 0, 10)
+JumpPowerBar.Position = UDim2.new(0, 5, 0, 140)
+JumpPowerBar.Text = ""
+JumpPowerBar.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+JumpPowerBar.Parent = PlayerFrame
+JumpPowerBar.MouseButton1Down:Connect(function()
+    local mouse = player:GetMouse()
+    local conn
+    conn = mouse.Move:Connect(function()
+        local value = math.clamp((mouse.X - JumpPowerBar.AbsolutePosition.X) / JumpPowerBar.AbsoluteSize.X, 0, 1)
+        jumpPower = math.floor(50 + value * 150)
+        if not flying then humanoid.JumpPower = jumpPower end
+        JumpPowerSlider.Text = "Прыжок: " .. jumpPower
+    end)
+    mouse.Button1Up:Wait()
+    conn:Disconnect()
+end)
+
+-- Меню полёта
+local FlyGui = Instance.new("ScreenGui")
+FlyGui.Name = "FlyMenu"
+FlyGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+FlyGui.ResetOnSpawn = false
+
+local FlyFrame = Instance.new("Frame")
+FlyFrame.Size = UDim2.new(0, 200, 0, 200) -- Увеличил высоту для инструкции
+FlyFrame.Position = UDim2.new(0.5, -100, 0.5, -100)
+FlyFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+FlyFrame.Parent = FlyGui
+FlyFrame.Active = true
+FlyFrame.Draggable = true
+FlyFrame.Visible = false
+
+local FlyTitle = Instance.new("TextLabel")
+FlyTitle.Size = UDim2.new(1, 0, 0, 30)
+FlyTitle.Text = "Полет"
+FlyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyTitle.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+FlyTitle.Parent = FlyFrame
+
+local FlyToggle = Instance.new("TextButton")
+FlyToggle.Size = UDim2.new(1, -10, 0, 40)
+FlyToggle.Position = UDim2.new(0, 5, 0, 40)
+FlyToggle.Text = "Вкл/Выкл"
+FlyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+FlyToggle.Parent = FlyFrame
+
+local FlySpeedSlider = Instance.new("TextLabel")
+FlySpeedSlider.Size = UDim2.new(1, -10, 0, 20)
+FlySpeedSlider.Position = UDim2.new(0, 5, 0, 85)
+FlySpeedSlider.Text = "Скорость: " .. flySpeed
+FlySpeedSlider.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlySpeedSlider.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+FlySpeedSlider.Parent = FlyFrame
+
+local FlySpeedBar = Instance.new("TextButton")
+FlySpeedBar.Size = UDim2.new(1, -10, 0, 10)
+FlySpeedBar.Position = UDim2.new(0, 5, 0, 105)
+FlySpeedBar.Text = ""
+FlySpeedBar.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+FlySpeedBar.Parent = FlyFrame
+FlySpeedBar.MouseButton1Down:Connect(function()
+    local mouse = player:GetMouse()
+    local conn
+    conn = mouse.Move:Connect(function()
+        local value = math.clamp((mouse.X - FlySpeedBar.AbsolutePosition.X) / FlySpeedBar.AbsoluteSize.X, 0, 1)
+        flySpeed = math.floor(10 + value * 90)
+        FlySpeedSlider.Text = "Скорость: " .. flySpeed
+    end)
+    mouse.Button1Up:Wait()
+    conn:Disconnect()
+end)
+
+local FlyControls = Instance.new("TextLabel")
+FlyControls.Size = UDim2.new(1, -10, 0, 50)
+FlyControls.Position = UDim2.new(0, 5, 0, 120)
+FlyControls.Text = "Управление:\nДжойстик - движение\nПрыжок - вверх\nУдержание - вниз"
+FlyControls.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyControls.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+FlyControls.TextSize = 14
+FlyControls.TextWrapped = true
+FlyControls.Parent = FlyFrame
+
+local FlyMinimize = Instance.new("TextButton")
+FlyMinimize.Size = UDim2.new(0, 30, 0, 30)
+FlyMinimize.Position = UDim2.new(1, -35, 0, 5)
+FlyMinimize.Text = "-"
+FlyMinimize.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyMinimize.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+FlyMinimize.Parent = FlyFrame
+
+local FlyBall = Instance.new("TextButton")
+FlyBall.Size = UDim2.new(0, 40, 0, 40)
+FlyBall.Position = UDim2.new(0.5, -20, 0.3, -20)
+FlyBall.Text = "F"
+FlyBall.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyBall.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+FlyBall.Parent = FlyGui
+FlyBall.Visible = false
+FlyBall.Active = true
+FlyBall.Draggable = true
+
+-- Вкладка Misc
+local MiscFrame = tabFrames["Misc"]
+
+local InfJumpButton = Instance.new("TextButton")
+InfJumpButton.Size = UDim2.new(1, -10, 0, 40)
+InfJumpButton.Position = UDim2.new(0, 5, 0, 5)
+InfJumpButton.Text = "Бесконечный прыжок: Выкл"
+InfJumpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+InfJumpButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+InfJumpButton.Parent = MiscFrame
+
+local ClickTPButton = Instance.new("TextButton")
+ClickTPButton.Size = UDim2.new(1, -10, 0, 40)
+ClickTPButton.Position = UDim2.new(0, 5, 0, 50)
+ClickTPButton.Text = "Телепорт по тапу: Выкл"
+ClickTPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClickTPButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+ClickTPButton.Parent = MiscFrame
+
+-- Вкладка Random
+local RandomFrame = tabFrames["Random"]
+
+local RainbowButton = Instance.new("TextButton")
+RainbowButton.Size = UDim2.new(1, -10, 0, 40)
+RainbowButton.Position = UDim2.new(0, 5, 0, 5)
+RainbowButton.Text = "Радуга: Выкл"
+RainbowButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+RainbowButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+RainbowButton.Parent = RandomFrame
+
+-- Вкладка FE
+local FEFrame = tabFrames["FE"]
+
+local PartButton = Instance.new("TextButton")
+PartButton.Size = UDim2.new(1, -10, 0, 40)
+PartButton.Position = UDim2.new(0, 5, 0, 5)
+PartButton.Text = "Part (Ring)"
+PartButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+PartButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+PartButton.Parent = FEFrame
+
+-- Функции
+local function toggleFly()
+    flying = not flying
+    print("Полет: " .. (flying and "Включён" or "Выключен"))
+    if flying then
+        local bg = Instance.new("BodyGyro")
+        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bg.P = 9e4
+        bg.Parent = rootPart
+
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.Parent = rootPart
+
+        humanoid.PlatformStand = true
+        spawn(function()
+            while flying and rootPart and bg.Parent and bv.Parent do
+                bg.CFrame = workspace.CurrentCamera.CFrame
+                local moveDir = humanoid.MoveDirection * flySpeed
+                local vertical = 0
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) or humanoid.Jump then
+                    vertical = flySpeed
+                elseif UserInputService.TouchLongPress then
+                    vertical = -flySpeed
+                end
+                bv.Velocity = moveDir + Vector3.new(0, vertical, 0)
+                wait(0.01)
+            end
+            bg:Destroy()
+            bv:Destroy()
+            humanoid.PlatformStand = false
+            humanoid.WalkSpeed = walkSpeed
+            humanoid.JumpPower = jumpPower
+            print("Полет остановлен")
+        end)
+    end
+end
+
+local function toggleNoclip()
+    noclip = not noclip
+    spawn(function()
+        while noclip and character do
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+            wait()
+        end
+        if character then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end)
+end
+
+local function toggleRainbow()
+    rainbow = not rainbow
+    RainbowButton.Text = "Радуга: " .. (rainbow and "Вкл" or "Выкл")
+    if rainbow then
+        spawn(function()
+            while rainbow and character do
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.Color = Color3.fromHSV(tick() % 1, 1, 1)
+                    end
+                end
+                wait(0.1)
+            end
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Color = Color3.fromRGB(255, 255, 255)
+                end
+            end
+        end)
+    end
+end
+
+local function toggleInfJump()
+    infJump = not infJump
+    InfJumpButton.Text = "Бесконечный прыжок: " .. (infJump and "Вкл" or "Выкл")
+    if infJump then
+        UserInputService.JumpRequest:Connect(function()
+            if infJump then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end)
+    end
+end
+
+local clickTPActive = false
+local function toggleClickTP()
+    clickTPActive = not clickTPActive
+    ClickTPButton.Text = "Телепорт по тапу: " .. (clickTPActive and "Вкл" or "Выкл")
+    if clickTPActive then
+        spawn(function()
+            while clickTPActive do
+                UserInputService.InputBegan:Wait()
+                if UserInputService:GetMouseLocation() then
+                    local ray = workspace.CurrentCamera:ScreenPointToRay(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+                    local hit, pos = workspace:FindPartOnRay(Ray.new(ray.Origin, ray.Direction * 1000), character)
+                    if pos then
+                        rootPart.CFrame = CFrame.new(pos)
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- Управление кнопками
+FlyButton.MouseButton1Click:Connect(function()
+    FlyFrame.Visible = true
+end)
+
+FlyToggle.MouseButton1Click:Connect(function()
+    toggleFly()
+    FlyToggle.Text = flying and "Выключить" or "Включить"
+end)
+
+FlyMinimize.MouseButton1Click:Connect(function()
+    FlyFrame.Visible = false
+    FlyBall.Visible = true
+end)
+
+FlyBall.MouseButton1Click:Connect(function()
+    FlyFrame.Visible = true
+    FlyBall.Visible = false
+end)
+
+InfJumpButton.MouseButton1Click:Connect(toggleInfJump)
+ClickTPButton.MouseButton1Click:Connect(toggleClickTP)
+RainbowButton.MouseButton1Click:Connect(toggleRainbow)
+PartButton.MouseButton1Click:Connect(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/hm5650/SuperRing/refs/heads/main/RingPart"))()
+end)
+
+-- Обновление при респавне
+player.CharacterAdded:Connect(function(char)
+    character = char
+    rootPart = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
+    humanoid.WalkSpeed = walkSpeed
+    humanoid.JumpPower = jumpPower
+    PlayerName.Text = "Ник: " .. player.Name
+    if noclip then
+        toggleNoclip()
+        wait(0.1)
+        toggleNoclip()
+    end
+    if flying then
+        toggleFly()
+        wait(0.1)
+        toggleFly()
+        FlyToggle.Text = "Выключить"
+    else
+        FlyToggle.Text = "Включить"
+    end
+    if rainbow then
+        toggleRainbow()
+        wait(0.1)
+        toggleRainbow()
+        RainbowButton.Text = "Радуга: Вкл"
+    else
+        RainbowButton.Text = "Радуга: Выкл"
+    end
+end)
+
+print("Скрипт запущен")
